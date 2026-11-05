@@ -141,21 +141,31 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 
+# ─── Email / SMTP ────────────────────────────────────────────────────────────
+# Настройки читаются из файла .env (скопируй из .env.example).
+# Если .env не создан — письма выводятся в консоль (режим разработки).
+
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "newsletter@localhost")
 
 _email_host = os.environ.get("EMAIL_HOST", "").strip()
+
 if _email_host:
-    _mailer_options = {"host": _email_host}
+    _mailer_options = {
+        "host": _email_host,
+        "timeout": 10,  # секунд на соединение с SMTP-сервером
+    }
     if os.environ.get("EMAIL_PORT", "").strip():
         _mailer_options["port"] = int(os.environ["EMAIL_PORT"])
     if os.environ.get("EMAIL_HOST_USER", "").strip():
         _mailer_options["username"] = os.environ["EMAIL_HOST_USER"].strip()
     if os.environ.get("EMAIL_HOST_PASSWORD", ""):
-        _mailer_options["password"] = os.environ["EMAIL_HOST_PASSWORD"]
+        # Gmail: пароль приложения может содержать пробелы — убираем их
+        _mailer_options["password"] = os.environ["EMAIL_HOST_PASSWORD"].replace(" ", "")
     if _env_bool("EMAIL_USE_SSL", False):
         _mailer_options["use_ssl"] = True
     elif _env_bool("EMAIL_USE_TLS", True):
         _mailer_options["use_tls"] = True
+
     MAILERS = {
         "default": {
             "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
@@ -163,6 +173,8 @@ if _email_host:
         }
     }
 else:
+    # Режим разработки: письма выводятся в консоль, реально не отправляются.
+    # Создай .env с настройками Gmail для реальной отправки.
     MAILERS = {
         "default": {
             "BACKEND": "django.core.mail.backends.console.EmailBackend",

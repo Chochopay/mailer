@@ -1,41 +1,50 @@
-# 🚀 Запуск mailer на новом компьютере
+# 📬 Mailer — Django REST рассылка
+
+Простое приложение на Django REST Framework: вводишь email → приходит письмо.
+
+---
 
 ## Требования
+
 - Python 3.10+
 - Git
 
 ---
 
-## 1. Клонировать репозиторий
+## Установка
 
 ```bash
+# 1. Клонировать репозиторий
 git clone https://github.com/Chochopay/mailer.git
 cd mailer
-```
 
----
-
-## 2. Создать виртуальное окружение и установить зависимости
-
-```bash
-# Создать venv
+# 2. Создать виртуальное окружение
 python -m venv .venv
 
-# Активировать (Windows)
-.venv\Scripts\activate
+# 3. Активировать
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # Linux / macOS
 
-# Активировать (Linux / macOS)
-source .venv/bin/activate
-
-# Установить зависимости
+# 4. Установить зависимости
 pip install -r requirements.txt
+
+# 5. Применить миграции
+python manage.py migrate
 ```
 
 ---
 
-## 3. Настроить переменные окружения
+## Настройка отправки писем (Gmail)
 
-Скопируй `.env.example` в `.env` и заполни своими данными:
+> Без этого шага письма будут выводиться только в консоль — реально не отправляться.
+
+### Шаг 1 — Создай пароль приложения Gmail
+
+1. Включи **двухфакторную аутентификацию**: https://myaccount.google.com/security
+2. Перейди: **Google Аккаунт → Безопасность → Пароли приложений**
+3. Создай пароль — получишь 16 символов вида `xxxx xxxx xxxx xxxx`
+
+### Шаг 2 — Создай файл `.env`
 
 ```bash
 # Windows
@@ -45,31 +54,28 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-Открой `.env` и укажи настройки SMTP:
+Открой `.env` и заполни своими данными:
 
 ```env
-DEFAULT_FROM_EMAIL=newsletter@yourdomain.com
+DEFAULT_FROM_EMAIL=your@gmail.com
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_HOST_USER=your@gmail.com
-EMAIL_HOST_PASSWORD=your-app-password
+EMAIL_HOST_PASSWORD=xxxx xxxx xxxx xxxx
 EMAIL_USE_TLS=true
 ```
 
-> [!NOTE]
-> Если `.env` не создавать — письма будут просто выводиться в консоль (режим разработки). Удобно для тестирования без реального SMTP.
-
----
-
-## 4. Применить миграции
+### Шаг 3 — Проверь, что всё работает
 
 ```bash
-python manage.py migrate
+python manage.py send_test_email recipient@example.com
 ```
+
+Если письмо пришло — всё настроено правильно. ✅
 
 ---
 
-## 5. Запустить сервер
+## Запуск сервера
 
 ```bash
 python manage.py runserver
@@ -77,9 +83,11 @@ python manage.py runserver
 
 Открой браузер: **http://127.0.0.1:8000/**
 
+Введи email в форму → нажми «Отправить» → письмо придёт на почту.
+
 ---
 
-## 6. (Опционально) Запустить тесты
+## Тесты
 
 ```bash
 python manage.py test broadcast
@@ -89,16 +97,29 @@ python manage.py test broadcast
 
 ---
 
-## Итоговая последовательность (кратко)
+## Структура проекта
 
-```bash
-git clone https://github.com/Chochopay/mailer.git
-cd mailer
-python -m venv .venv
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # Linux/macOS
-pip install -r requirements.txt
-copy .env.example .env        # заполнить .env своими данными
-python manage.py migrate
-python manage.py runserver
 ```
+mailer/
+├── broadcast/
+│   ├── management/
+│   │   └── commands/
+│   │       └── send_test_email.py  # команда для проверки Gmail
+│   ├── content.py      # тема и текст письма (редактируй здесь)
+│   ├── serializers.py  # валидация email
+│   ├── services.py     # DNS-проверка домена + отправка
+│   ├── views.py        # API + страница
+│   └── urls.py
+├── config/
+│   └── settings.py     # SMTP-конфиг через .env
+├── templates/
+│   └── index.html      # форма с тёмным дизайном
+├── .env.example        # шаблон настроек (скопируй в .env)
+└── requirements.txt
+```
+
+---
+
+## Изменить текст письма
+
+Открой [`broadcast/content.py`](broadcast/content.py) и замени `SUBJECT` и `BODY`.
