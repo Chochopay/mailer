@@ -6,9 +6,8 @@
   <title>Рассылка</title>
   <style>
     :root { color-scheme: dark; }
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      margin: 0;
       min-height: 100vh;
       display: grid;
       place-items: center;
@@ -16,67 +15,176 @@
       color: #ececec;
       font: 16px/1.5 ui-sans-serif, system-ui, sans-serif;
     }
+
     main { width: min(420px, calc(100% - 32px)); }
-    h1 { font-size: 1.25rem; font-weight: 560; margin: 0 0 8px; }
-    .lead { margin: 0 0 24px; color: #9a9a9a; }
+    h1 { font-size: 1.25rem; font-weight: 560; margin-bottom: 8px; }
+    .lead { margin-bottom: 24px; color: #9a9a9a; }
+
     form { display: grid; gap: 12px; }
     input, button {
       font: inherit;
       border-radius: 8px;
       padding: 12px 14px;
+      width: 100%;
     }
     input {
       background: #161616;
       color: inherit;
       border: 1px solid #2c2c2c;
+      transition: border-color .15s;
     }
-    input:focus { outline: 1px solid #8a8a8a; }
+    input:focus { outline: none; border-color: #8a8a8a; }
+
     button {
       background: #f2f2f2;
       color: #111;
       border: 0;
       cursor: pointer;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: opacity .15s;
     }
     button:disabled { opacity: 0.55; cursor: default; }
-    .status { min-height: 1.5em; margin: 16px 0 0; color: #bdbdbd; }
-    .status.error { color: #e08b8b; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #55555570;
+      border-top-color: #111;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+      flex-shrink: 0;
+    }
+    button.loading .spinner { display: block; }
+    button.loading .btn-text { opacity: 0.7; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Result cards ── */
+    .result-card {
+      display: none;
+      margin-top: 20px;
+      border-radius: 10px;
+      padding: 16px 18px;
+      animation: fadeIn .25s ease;
+    }
+    .result-card.visible { display: flex; gap: 14px; align-items: flex-start; }
+
+    .result-card.success {
+      background: #0d2a1a;
+      border: 1px solid #1a5c35;
+    }
+    .result-card.error {
+      background: #2a0d0d;
+      border: 1px solid #5c1a1a;
+    }
+
+    .result-icon {
+      font-size: 1.3rem;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .result-title {
+      font-weight: 600;
+      font-size: .95rem;
+      margin-bottom: 3px;
+    }
+    .result-card.success .result-title { color: #4ade80; }
+    .result-card.error   .result-title { color: #f87171; }
+    .result-body { font-size: .88rem; color: #9a9a9a; line-height: 1.4; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
   <main>
     <h1>Рассылка</h1>
     <p class="lead">Оставьте email — пришлём готовое письмо.</p>
+
     <form id="form">
       <input type="email" name="email" required placeholder="you@example.com" autocomplete="email">
-      <button type="submit">Отправить</button>
+      <button type="submit" id="btn">
+        <span class="spinner"></span>
+        <span class="btn-text">Отправить</span>
+      </button>
     </form>
-    <p class="status" id="status" role="status"></p>
+
+    <!-- Успех -->
+    <div class="result-card success" id="card-success">
+      <div class="result-icon">✅</div>
+      <div>
+        <div class="result-title">Письмо отправлено!</div>
+        <div class="result-body" id="success-msg">Проверьте вашу почту.</div>
+      </div>
+    </div>
+
+    <!-- Ошибка -->
+    <div class="result-card error" id="card-error">
+      <div class="result-icon">❌</div>
+      <div>
+        <div class="result-title">Не удалось отправить</div>
+        <div class="result-body" id="error-msg">Попробуйте ещё раз.</div>
+      </div>
+    </div>
   </main>
+
   <script>
-    const form = document.getElementById("form");
-    const status = document.getElementById("status");
-    const button = form.querySelector("button");
+    const form       = document.getElementById("form");
+    const btn        = document.getElementById("btn");
+    const cardOk     = document.getElementById("card-success");
+    const cardErr    = document.getElementById("card-error");
+    const successMsg = document.getElementById("success-msg");
+    const errorMsg   = document.getElementById("error-msg");
 
     function csrfToken() {
-      const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
-      return match ? decodeURIComponent(match[1]) : "";
+      const m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : "";
     }
 
-    function messageFrom(payload) {
-      if (!payload) return "Не удалось отправить письмо.";
-      if (payload.email) return payload.email[0];
+    function extractMessage(payload) {
+      if (!payload) return null;
+      if (payload.email)  return payload.email[0];
       if (payload.detail) return payload.detail;
-      return "Не удалось отправить письмо.";
+      return null;
     }
 
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      status.textContent = "";
-      status.classList.remove("error");
-      button.disabled = true;
+    function showResult(ok, msg) {
+      cardOk.classList.remove("visible");
+      cardErr.classList.remove("visible");
+
+      // force reflow so animation replays even on repeated submits
+      void cardOk.offsetWidth;
+
+      if (ok) {
+        successMsg.textContent = msg || "Проверьте вашу почту.";
+        cardOk.classList.add("visible");
+      } else {
+        errorMsg.textContent = msg || "Попробуйте ещё раз.";
+        cardErr.classList.add("visible");
+      }
+    }
+
+    function setLoading(on) {
+      btn.disabled = on;
+      btn.classList.toggle("loading", on);
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      cardOk.classList.remove("visible");
+      cardErr.classList.remove("visible");
+      setLoading(true);
 
       try {
-        const response = await fetch("/api/send/", {
+        const res = await fetch("/api/send/", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -84,15 +192,20 @@
           },
           body: JSON.stringify({ email: new FormData(form).get("email") }),
         });
-        const payload = await response.json().catch(() => null);
-        status.textContent = messageFrom(payload);
-        status.classList.toggle("error", !response.ok);
-        if (response.ok) form.reset();
+
+        const payload = await res.json().catch(() => null);
+        const msg     = extractMessage(payload);
+
+        if (res.ok) {
+          form.reset();
+          showResult(true, msg);
+        } else {
+          showResult(false, msg);
+        }
       } catch {
-        status.textContent = "Нет связи с сервером.";
-        status.classList.add("error");
+        showResult(false, "Нет связи с сервером.");
       } finally {
-        button.disabled = false;
+        setLoading(false);
       }
     });
   </script>

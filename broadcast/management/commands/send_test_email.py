@@ -25,9 +25,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         recipient = options["email"]
-        self.stdout.write(f"Отправляю письмо на {recipient}...")
+        self.stdout.write(f"Sending to {recipient}...")
         try:
             send_mailing(recipient)
         except Exception as exc:
-            raise CommandError(f"Не удалось отправить письмо: {exc}") from exc
-        self.stdout.write(self.style.SUCCESS(f"✓ Письмо успешно отправлено на {recipient}"))
+            raise CommandError(f"Failed to send: {exc}") from exc
+        self.stdout.write(self.style.SUCCESS(f"OK: email sent to {recipient}"))
